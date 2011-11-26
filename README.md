@@ -16,9 +16,9 @@ import Transactional
 data Connection = Connection { query :: String -> Transaction String }
 
 dummyDataSource :: DataSource (Connection)
-dummyDataSource = DataSource $ return (Connection dummyConnection, dummyCommitable)
+dummyDataSource = DataSource $ return (Connection dummyQuery, dummyCommitable)
 
-dummyConnection "DELETE FROM USERS" = do
+dummyQuery "DELETE FROM USERS" = do
   liftIO $ putStrLn $ "querying.."
   return "lol"
 
@@ -35,7 +35,6 @@ failingTransaction = transactionally $ do
   conn <- getConnection dummyDataSource
   query conn "DROP TABLE USERS"
   return ()
-
 ~~~
 
 If you run this in GHCI, you see how connections are commited and rolled back automatically:

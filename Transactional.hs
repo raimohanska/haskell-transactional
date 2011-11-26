@@ -1,27 +1,23 @@
-module Transactional(Transactional, Connection, transactionally, getConnection) where
+module Transactional(Transaction, Commitable, DataSource(), transactionally) where
 
-data Connection = Connection
-data Transactional a = Transactional (Connection -> IO a)
+data Commitable = Commitable {commit :: IO (), rollback :: IO ()}
+type State = [Commitable]
+data Transaction a = Transaction (State -> IO (a, State))
 
-instance Monad Transactional where
-  (>>=) op toNext = Transactional $ \conn -> perform conn op >>= perform conn . toNext
-  return a = Transactional $ return . const a
+data DataSource a = DataSource { getConnection :: IO (a, Commitable) } 
 
-getConnection :: Transactional Connection
-getConnection = Transactional $ return
+toCommitable :: IO () -> IO () -> Commitable
+toCommitable commit rollback = Commitable commit rollback
 
-perform :: Connection -> Transactional a -> IO a
-perform conn (Transactional op) = op conn
+instance Monad Transaction where
+  (>>=) op toNext = Transaction $ \state -> perform state op >>= \(a, state2) -> perform state2 (toNext a)
+  return a = Transaction $ \st -> return (a, st)
 
-newConnection :: IO Connection
-newConnection = undefined
+perform :: State -> Transaction a -> IO (a, State)
+perform state (Transaction op) = op state
 
-commit :: Connection -> IO ()
-commit = undefined
-
-transactionally :: Transactional a -> IO a
-transactionally (Transactional op) = do
-  conn <- newConnection
-  result <- op conn
-  commit conn 
+transactionally :: Transaction a -> IO a
+transactionally (Transaction op) = do
+  (result, commitables) <- op []
+  mapM_ commit commitables 
   return result

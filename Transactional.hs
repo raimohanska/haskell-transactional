@@ -1,4 +1,4 @@
-module Transactional(Transaction, Commitable, DataSource(), transactionally, getConnection) where
+module Transactional(Transaction, Commitable, DataSource(DataSource, newConnection), transactionally, getConnection, liftIO, toCommitable) where
 
 import Data.IORef
 import Control.Exception
@@ -23,6 +23,9 @@ getConnection :: DataSource a -> Transaction a
 getConnection ds = Transaction $ \state -> do (newConn, commitable) <- newConnection ds
                                               modifyIORef state (commitable :)
                                               return newConn
+
+liftIO :: IO a -> Transaction a
+liftIO action = Transaction $ \state -> action
 
 transactionally :: Transaction a -> IO a
 transactionally (Transaction op) = bracketOnError (newIORef [])
